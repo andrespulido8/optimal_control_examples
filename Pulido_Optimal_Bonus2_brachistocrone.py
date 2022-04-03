@@ -6,15 +6,15 @@ import matplotlib.pyplot as plt
 plt.style.use('seaborn-poster')
 
 
-def multiple_shooting(initial_states, final_states, guesses, K):
+def multiple_shooting(initial_states, final_states, guesses, K, is_print=False):
 
     def objective(obj0):
+        if is_print:
+            print("\nDecision vector: ", obj0)
         global theta_array
-        tf = obj0[3]
-        ptot0 = np.reshape(obj0[4:], [2*nx, K-1])
-        points = 100
-        tau_array = np.empty([K, points])
-        states = np.empty([K, points])
+        tf = obj0[nx]
+        ptot0 = np.reshape(obj0[nx+1:], [2*nx, K-1])
+        points = 1000
         E_array = np.empty([K-1, nx*2])
 
         for k in range(K):
@@ -25,8 +25,9 @@ def multiple_shooting(initial_states, final_states, guesses, K):
 
             tau_eval = np.linspace(tau[k], tau[k+1], points)
 
-            sol = solve_ivp(dynamics, [tau_eval[0], tau_eval[-1]],
-                            p0, t_eval=tau_eval, args=(t0, tf), dense_output=True)
+            sol = solve_ivp(dynamics, [tau[k], tau[k+1]],
+                            p0, t_eval=tau_eval, args=(t0, tf), dense_output=False, method='radau')
+            # print(sol.message)
 
             x = sol.y[0]
             y = sol.y[1]
@@ -40,8 +41,8 @@ def multiple_shooting(initial_states, final_states, guesses, K):
                 eq1 = x[-1] - ptots_end[0]
                 eq2 = y[-1] - ptots_end[1]
                 eq3 = v[-1] - ptots_end[2]
-                eq4 = lambx[-1] - ptots_end[3]
-                eq5 = lamby[-1] - ptots_end[4]
+                eq4 = lambx[-1]-1 - ptots_end[3]
+                eq5 = lamby[-1]-1 - ptots_end[4]
                 eq6 = lambv[-1] - ptots_end[5]
                 E_array[k, :] = [eq1, eq2, eq3, eq4, eq5, eq6]
                 #print([eq1, eq2, eq3, eq4])
@@ -56,13 +57,15 @@ def multiple_shooting(initial_states, final_states, guesses, K):
         eq2f = y[-1] - yf
         eq3f = lambv[-1]
         eq4f = H + 1
+
         E_array = np.reshape(E_array, 2*nx*(K-1))
-        E_array = np.concatenate((E_array, [eq1, eq2, eq3, eq4]), axis=None)
+        E_array = np.concatenate(
+            (E_array, [eq1f, eq2f, eq3f, eq4f]), axis=None)
 
         return E_array
 
     def dynamics(t, s, tinitial, tfinal):
-        global theta, theta_array
+        global theta_array
 
         v_t = s[2]
         lambx_t = s[3]
@@ -74,7 +77,17 @@ def multiple_shooting(initial_states, final_states, guesses, K):
             # print(ht)
             return ht
 
-        theta, = fsolve(solve_control, theta_guess)
+        full_output = False
+
+        theta = fsolve(
+            solve_control, theta_guess, full_output=full_output)
+        if full_output:
+            print("Theta solution found? ",
+                  "yes!" if theta[2] == 1 else "No :(")
+            print("msg: ", theta[3])
+            print("n func calls: ", theta[1]["nfev"])
+        theta = theta[0]
+
         theta_array.append(theta)
 
         x_dot = v_t*np.sin(theta)
@@ -102,16 +115,18 @@ def multiple_shooting(initial_states, final_states, guesses, K):
 
     tau = np.linspace(-1, +1, K+1)
 
-    ptot0guess = np.zeros([2*nx, K-1])
-    ptot0guess[1, 0] = 5
-    ptot0guess[1, 1] = 8
+    ptot0guess = np.ones([2*nx, K-1])
     reshaped = np.reshape(ptot0guess, 2*nx*(K-1))
     changing = np.concatenate([guesses[0:4], reshaped])
 
     obj_sol, obj_dict, ier, mesg = fsolve(objective, changing, xtol=10e-8,
                                           full_output=True)
-
-    print("Solution found? ", ier)
+    print("Solution found? ", "yes!" if ier == 1 else "No :(")
+    print("msg: ", mesg)
+    print("n func calls: ", obj_dict["nfev"])
+    obj_sol, obj_dict, ier, mesg = fsolve(objective, obj_sol, xtol=10e-8,
+                                          full_output=True)
+    print("Solution found? ", "yes!" if ier == 1 else "No :(")
     print("msg: ", mesg)
     print("n func calls: ", obj_dict["nfev"])
 
@@ -121,6 +136,7 @@ def multiple_shooting(initial_states, final_states, guesses, K):
     tau_array = np.empty([K, points])
     y_array = np.empty([K, points])
     x_array = np.empty([K, points])
+    v_array = np.empty([K, points])
     for k in range(K):
         if k == 0:
             p0 = [x0, y0, v0, obj_sol[0], obj_sol[1], obj_sol[2]]
@@ -132,13 +148,13 @@ def multiple_shooting(initial_states, final_states, guesses, K):
         tau_array[k] = sol.t
         x_array[k] = sol.y[0]
         y_array[k] = sol.y[1]
+        v_array[k] = sol.y[2]
 
     plt.figure(figsize=(10, 8))
     plt.plot(np.reshape(x_array, K*points), -1*np.reshape(y_array, K*points))
     plt.xlabel('x')
     plt.ylabel('y')
     plt.title(f'Brachistocrone Curve')
-    plt.legend()
     plt.show()
 
     plt.figure(figsize=(10, 8))
@@ -146,7 +162,8 @@ def multiple_shooting(initial_states, final_states, guesses, K):
              np.reshape(x_array, K*points), label='x')
     plt.plot(np.reshape(tau_array, K*points),
              np.reshape(y_array, K*points), label='y')
-    #plt.plot(sol.t, sol.y[2], label='v')
+    # plt.plot(np.reshape(tau_array, K*points),
+    #         np.reshape(v_array, K*points), label='v')
     plt.xlabel('t')
     plt.ylabel('Value')
     plt.title(f'States')
@@ -165,18 +182,18 @@ def main():
     v0 = 0
     #vf = free
 
-    K = 3
+    K = 20
 
     initial_states = [x0, y0, v0]
     final_states = [xf, yf]
 
-    lamb0_guess = [1.2, 0.8, 1]
-    tf_guess = [0.9]
+    lamb0_guess = [1, 1, 1]
+    tf_guess = [10]
     theta_guess = [0.5]
 
     guesses = lamb0_guess + tf_guess + theta_guess  # list of element guesses
 
-    multiple_shooting(initial_states, final_states, guesses, K)
+    multiple_shooting(initial_states, final_states, guesses, K, True)
 
 
 if __name__ == "__main__":
