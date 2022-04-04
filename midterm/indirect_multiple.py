@@ -197,7 +197,7 @@ def main():
 
     nx = 5  # number of states
 
-    K = 5
+    K = 10
 
     # Initial conditions
     r0 = 1
