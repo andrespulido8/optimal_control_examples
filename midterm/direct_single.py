@@ -72,16 +72,16 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
 
     def objective(obj):
         tf = obj[0]
-        t_eval = np.linspace(0, tf, 1000)
+        #t_eval = np.linspace(0, tf, 1000)
 
         # euler forward solver
-        soly = np.zeros((1000+1, nx))
-        soly[0, :] = initial_states
-        dt = tf/1000
-        for ii, t in enumerate(t_eval):
-            soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii], obj[1:])*dt
+        #soly = np.zeros((1000+1, nx))
+        #soly[0, :] = initial_states
+        #dt = tf/1000
+        # for ii, t in enumerate(t_eval):
+        #    soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii], obj[1:])*dt
 
-        m_tf = soly[:, 4][-1]
+        #m_tf = soly[:, 4][-1]
 
         # return -obj_vec[0]
         #print("Coefficients: ", obj[1:])
