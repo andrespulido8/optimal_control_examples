@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 plt.style.use('seaborn-poster')
 
 
-def indirect_single_shooting_method(initial_states, final_states, guesses, nx):
+def indirect_single_shooting_method(initial_states, final_states, guesses, nx, states_str, nu, control_str):
 
     def objective(obj0):
         global beta_array, t_array
@@ -32,23 +32,23 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx):
         lambm = sol.y[9]
 
         # euler forward solver
-        #soly = np.zeros((1000+1, 2*nx))
-        #soly[0, :] = x0
-        #dt = tf/1000
+        # soly = np.zeros((1000+1, 2*nx))
+        # soly[0, :] = x0
+        # dt = tf/1000
         # for ii, t in enumerate(t_eval):
         #    soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii])*dt
 
-        ##soly = odeint(dynamics, x0, t_eval, tfirst=True, printmessg=1)
-        #r = soly[:, 0]
-        #vr = soly[:, 1]
-        #theta = soly[:, 2]
-        #vtheta = soly[:, 3]
-        #m = soly[:, 4]
-        #lambr = soly[:, 5]
-        #lambvr = soly[:, 6]
-        #lambtheta = soly[:, 7]
-        #lambvtheta = soly[:, 8]
-        #lambm = soly[:, 9]
+        # soly = odeint(dynamics, x0, t_eval, tfirst=True, printmessg=1)
+        # r = soly[:, 0]
+        # vr = soly[:, 1]
+        # theta = soly[:, 2]
+        # vtheta = soly[:, 3]
+        # m = soly[:, 4]
+        # lambr = soly[:, 5]
+        # lambvr = soly[:, 6]
+        # lambtheta = soly[:, 7]
+        # lambvtheta = soly[:, 8]
+        # lambm = soly[:, 9]
 
         # H = lambr[-1]*vr[-1] + lambvr[-1]*(-mu/r[-1] + vtheta[-1]**2/r[-1] + T*np.sin(beta_array[-1])/m[-1]) + lambtheta[-1] * \
         #    vtheta[-1]/r[-1] + lambvtheta[-1] * \
@@ -93,7 +93,7 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx):
             # print(bt)
             return Hbeta
 
-        #full_output = False
+        # full_output = False
         # beta = root(
         #    solve_control, beta_guess, tol=1e-6)
         # if full_output:
@@ -137,15 +137,14 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx):
     vtheta0 = initial_states[3]
     m0 = initial_states[4]
 
-    # r0, vr0, theta0, vtheta, m, lambr0, lambvr0, lambtheta0, lambvtheta_0, lambm_0
     obj_sol = root(objective, guesses[0:-1], method="hybr", tol=1e-4)
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
     print("msg: ", obj_sol.message)
     print("n func calls: ", obj_sol.nfev)
-    #obj_sol = root(objective, obj_sol.x, method="hybr", tol=1e-8)
-    #print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
-    #print("msg: ", obj_sol.message)
-    #print("n func calls: ", obj_sol.nfev)
+    # obj_sol = root(objective, obj_sol.x, method="hybr", tol=1e-8)
+    # print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
+    # print("msg: ", obj_sol.message)
+    # print("n func calls: ", obj_sol.nfev)
 
     obj_sol = obj_sol.x
 
@@ -157,55 +156,71 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx):
     tf = obj_sol[nx]
     t_eval = np.linspace(0, tf, 1000)
 
-    sol = solve_ivp(dynamics, [0, tf], sol_initial_states, t_eval=t_eval)
+    #sol = solve_ivp(dynamics, [0, tf], sol_initial_states, t_eval=t_eval)
 
     # euler forward solver
-    #soly = np.zeros((1000+1, 2*nx))
-    #soly[0, :] = sol_initial_states
-    #dt = tf/1000
-    # for ii, t in enumerate(t_eval):
-    #    soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii])*dt
+    soly = np.zeros((1000+1, 2*nx))
+    soly[0, :] = sol_initial_states
+    dt = tf/1000
+    for ii, t in enumerate(t_eval):
+        soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii])*dt
 
-    #soly = odeint(dynamics, x0, t_eval, tfirst=True, printmessg=1)
-    #r = soly[:, 0]
-    #vr = soly[:, 1]
-    #theta = soly[:, 2]
-    #vtheta = soly[:, 3]
-    #m = soly[:, 4]
+    # soly = odeint(dynamics, x0, t_eval, tfirst=True, printmessg=1)
+    # r = soly[:, 0]
+    # vr = soly[:, 1]
+    # theta = soly[:, 2]
+    # vtheta = soly[:, 3]
+    # m = soly[:, 4]
 
     print("beta array shape: ", len(beta_array))
     print("max beta: ", max(beta_array))
-    aa = np.array(t_array)
-    bb = np.degrees(beta_array)[:]
-    control = np.array([aa, bb])
-    sortedCon = control[:, control[0].argsort()]
+    #aa = np.array(t_array)
+    #bb = np.degrees(beta_array)[:]
+    #control = np.array([aa, bb])
+    #sortedCon = control[:, control[0].argsort()]
+    #control_val = sortedCon[1]
+    #control_time = sortedCon[0]
+    control_val = np.degrees(beta_array)
+    control_time = np.array(t_array)
 
-    plt.figure(figsize=(10, 8))
-    plt.plot(sortedCon[0], sortedCon[1])
-    plt.xlabel('t')
-    plt.ylabel('Beta')
-    plt.legend()
+    #states_val = np.transpose(sol.y)
+    states_val = soly[0:-1, :]
+
+    plot_shooting(time=t_eval, states_val=states_val, states_str=states_str,
+                  nx=nx, control_val=control_val, control_str=control_str, nu=nu, control_time=control_time, is_costates='True')
+
+
+def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates='False'):
+    """ Plots all states, all costates (if is_costate == True), the beta control and the orbit transfer in polar coord.
+        nx - number of states
+        nu - number of controls
+    """
+    fig1, axs1 = plt.subplots(nx)
+    fig1.suptitle("State evolution of {} ".format(states_str[0:nx]))
+    #fig2, axs2 = plt.subplots(nu)
+    #fig2.suptitle("State evolution of {} ".format(control_str))
+    for jj in range(nx):
+        axs1[jj].plot(time, states_val[:, jj])
+        axs1[jj].set_ylabel(states_str[jj])
+    if is_costates == True:
+        fig3, axs3 = plt.subplots(nx)
+        fig3.suptitle("Co-state evolution of {} ".format(states_str[nx:]))
+        for jj in range(nx):
+            axs3[jj].plot(time, states_val[:, nx+jj])
+            axs3[jj].set_ylabel(states_str[nx+jj])
+    plt.xlabel("time [s]")
     plt.show()
 
     plt.figure(figsize=(10, 8))
-    plt.plot(t_eval, sol.y[0], label='r')
-    #plt.plot(sol.t, sol.y[1], label='vr')
-    #plt.plot(sol.t, sol.y[2], label='theta')
-    #plt.plot(sol.t, sol.y[3], label='vtheta')
-    plt.xlabel('t')
-    plt.ylabel('Value')
-    plt.title(f'States')
-    plt.legend()
-    plt.show()
-    plt.figure(figsize=(10, 8))
-    plt.plot(t_eval, np.degrees(sol.y[2]), label='theta')
-    plt.legend()
+    plt.plot(control_time, control_val)
+    plt.ylabel(control_str[0])
+    plt.xlabel("time [s]")
+    plt.title(f'Control evolution')
     plt.show()
 
     plt.figure(figsize=(10, 8))
     plt.axes(projection='polar')
-    #plt.plot(sol.y[0]*np.cos(sol.y[2]), sol.y[0]*np.sin(sol.y[2]))
-    plt.polar(sol.y[2], sol.y[0])
+    plt.polar(states_val[:, 2], states_val[:, 0])
     plt.title(f'Trajectory Curve')
     plt.show()
 
@@ -217,6 +232,13 @@ def main():
     ve = 1.8758344
 
     nx = 5  # number of states
+    nu = 1  # number of controls
+
+    s_str = ['$r$', '$v_r$', '$theta$', '$v_theta$', 'm']
+    cs_str = ['$\lambda_r$', '$\lambda_vr$',
+              '$\lambda_theta$', '$\lambda v_theta$', '$\lambda_m$']
+    states_str = s_str + cs_str
+    control_str = ['$beta$']
 
     # Initial conditions
     r0 = 1
@@ -238,7 +260,8 @@ def main():
 
     guesses = lamb0_guess + tf_guess + beta_guess  # list of element guesses
 
-    indirect_single_shooting_method(initial_states, final_states, guesses, nx)
+    indirect_single_shooting_method(
+        initial_states, final_states, guesses, nx, states_str, nu, control_str)
 
 
 if __name__ == "__main__":

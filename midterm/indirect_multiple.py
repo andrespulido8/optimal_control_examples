@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 plt.style.use('seaborn-poster')
 
 
-def multiple_shooting(initial_states, final_states, guesses, nx, K, is_print=False):
+def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, nu, control_str, is_print=False):
 
     def objective(obj0):
         if is_print:
@@ -168,6 +168,8 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, is_print=Fal
     tau_array = np.empty([K, points])
     r_array = np.empty([K, points])
     theta_array = np.empty([K, points])
+    control_val = np.empty([K, points])
+    states_val = np.empty([K*points, 2*nx])
 
     for k in range(K):
         if k == 0:
@@ -176,15 +178,55 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, is_print=Fal
         else:
             p0 = ptot0[:, k-1]
         tau_eval = np.linspace(tau[k], tau[k+1], points)
-        sol = solve_ivp(dynamics, [tau_eval[0], tau_eval[-1]],
-                        p0, t_eval=tau_eval, args=(t0, tf), dense_output=True)
-        tau_array[k] = sol.t
-        r_array[k] = sol.y[0]
-        theta_array[k] = sol.y[2]
+
+        # sol = solve_ivp(dynamics, [tau_eval[0], tau_eval[-1]],
+        #                p0, t_eval=tau_eval, args=(t0, tf), dense_output=True)
+        #tau_array[k] = sol.t
+        #r_array[k] = sol.y[0]
+        #theta_array[k] = sol.y[2]
+
+        soly = np.zeros((points+1, 2*nx))
+        soly[0, :] = p0
+        dt = (tau[k+1] - tau[k])/points
+        for ii, t in enumerate(tau_eval):
+            soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii], t0, tf)*dt
+        control_val[k] = beta_array[0:points]
+        tau_array[k] = tau_eval
+        r_array[k] = soly[0:-1, 0]
+        theta_array[k] = soly[0:-1, 2]
+        states_val[points*k:points + points*k,
+                   :] = soly[0:-1, :]
+
+    plot_shooting(time=np.reshape(tau_array, K*points), states_val=states_val, states_str=states_str,
+                  nx=nx, control_val=np.reshape(control_val, K*points), control_str=control_str, nu=nu, control_time=np.reshape(tau_array, K*points), is_costates='True')
+
+
+def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates='False'):
+    """ Plots all states, all costates (if is_costate == True), the beta control and the orbit transfer in polar coord.
+        nx - number of states
+        nu - number of controls
+    """
+    fig1, axs1 = plt.subplots(nx)
+    fig1.suptitle("State evolution of {} ".format(states_str[0:nx]))
+    fig2, axs2 = plt.subplots(nu)
+    fig2.suptitle("State evolution of {} ".format(control_str))
+    for jj in range(nx):
+        axs1[jj].plot(time, states_val[:, jj])
+        axs1[jj].set_ylabel(states_str[jj])
+    if is_costates == True:
+        fig3, axs3 = plt.subplots(nx)
+        fig3.suptitle("Co-state evolution of {} ".format(states_str[nx:]))
+        for jj in range(nx):
+            axs3[jj].plot(time, states_val[:, nx+jj])
+            axs3[jj].set_ylabel(states_str[nx+jj])
+    axs2.plot(control_time, control_val)
+    axs2.set_ylabel(control_str[0])
+    plt.xlabel("time [s]")
+    plt.show()
 
     plt.figure(figsize=(10, 8))
     plt.axes(projection='polar')
-    plt.polar(np.reshape(theta_array, K*points), np.reshape(r_array, K*points))
+    plt.polar(states_val[:, 2], states_val[:, 0])
     plt.title(f'Trajectory Curve')
     plt.show()
 
@@ -196,6 +238,13 @@ def main():
     ve = 1.8758344
 
     nx = 5  # number of states
+    nu = 1  # number of controls
+
+    s_str = ['$r$', '$v_r$', '$theta$', '$v_theta$', 'm']
+    cs_str = ['$\lambda_r$', '$\lambda_vr$',
+              '$\lambda_theta$', '$\lambda v_theta$', '$\lambda_m$']
+    states_str = s_str + cs_str
+    control_str = ['$beta$']
 
     K = 10
 
@@ -219,9 +268,11 @@ def main():
 
     guesses = lamb0_guess + tf_guess + beta_guess  # list of element guesses
 
-    multiple_shooting(initial_states, final_states, guesses, nx, K, False)
+    multiple_shooting(initial_states, final_states, guesses,
+                      nx, K, states_str, nu, control_str, False)
 
 
 if __name__ == "__main__":
     main()
+
     print("Done")

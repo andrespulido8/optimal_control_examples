@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 plt.style.use('seaborn-poster')
 
 
-def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_guess, nx, N, bound):
+def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_guess, nx, N, bound, states_str, nu, control_str):
 
     def nonlinear_inequality(obj0):
         global beta_array, t_array, m_tf
@@ -121,38 +121,55 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
     obj_sol = obj_sol.x
 
     tf = obj_sol[0]
-    t_eval = np.linspace(0, tf, 100)
 
-    sol = solve_ivp(dynamics, [0, tf], initial_states,
-                    t_eval=t_eval, args=(obj_sol[1:],))
+    # sol = solve_ivp(dynamics, [0, tf], initial_states,
+    #                t_eval=t_eval, args=(obj_sol[1:],))
+
+    # euler forward solver
+    points = 1000
+    t_eval = np.linspace(0, tf, points)
+    soly = np.zeros((points+1, nx))
+    soly[0, :] = initial_states
+    dt = tf/points
+    for ii, t in enumerate(t_eval):
+        soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii], obj_sol[1:])*dt
 
     print("beta array shape: ", len(beta_array))
     print("max beta: ", max(beta_array))
-    control = np.array([t_array, np.degrees(beta_array)])
-    sortedCon = control[:, control[0].argsort()]
+    control_val = np.degrees(beta_array)
 
-    plt.figure(figsize=(10, 8))
-    plt.plot(sortedCon[0], sortedCon[1])
-    plt.xlabel('t')
-    plt.ylabel('Beta')
-    plt.legend()
-    plt.show()
+    states_val = soly[0:-1, :]
 
-    plt.figure(figsize=(10, 8))
-    plt.plot(sol.t, sol.y[0], label='r')
-    plt.xlabel('t')
-    plt.ylabel('Value')
-    plt.title(f'States')
-    plt.legend()
-    plt.show()
-    plt.figure(figsize=(10, 8))
-    plt.plot(sol.t, np.degrees(sol.y[2]), label='theta')
-    plt.legend()
+    plot_shooting(time=t_eval, states_val=states_val, states_str=states_str,
+                  nx=nx, control_val=control_val, control_str=control_str, nu=nu, control_time=t_eval, is_costates='False')
+
+
+def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates='False'):
+    """ Plots all states, all costates (if is_costate == True), the beta control and the orbit transfer in polar coord.
+        nx - number of states
+        nu - number of controls
+    """
+    fig1, axs1 = plt.subplots(nx)
+    fig1.suptitle("State evolution of {} ".format(states_str[0:nx]))
+    fig2, axs2 = plt.subplots(nu)
+    fig2.suptitle("State evolution of {} ".format(control_str))
+    for jj in range(nx):
+        axs1[jj].plot(time, states_val[:, jj])
+        axs1[jj].set_ylabel(states_str[jj])
+    if is_costates == True:
+        fig3, axs3 = plt.subplots(nx)
+        fig3.suptitle("Co-state evolution of {} ".format(states_str[nx:]))
+        for jj in range(nx):
+            axs3[jj].plot(time, states_val[:, nx+jj])
+            axs3[jj].set_ylabel(states_str[nx+jj])
+    axs2.scatter(control_time, control_val)
+    axs2.set_ylabel(control_str[0])
+    plt.xlabel("time [s]")
     plt.show()
 
     plt.figure(figsize=(10, 8))
     plt.axes(projection='polar')
-    plt.polar(sol.y[2], sol.y[0])
+    plt.polar(states_val[:, 2], states_val[:, 0])
     plt.title(f'Trajectory Curve')
     plt.show()
 
@@ -164,6 +181,7 @@ def main():
     ve = 1.8758344
 
     nx = 5  # number of states
+    nu = 1
 
     N = 10  # number of degrees for polynomial
 
@@ -178,6 +196,8 @@ def main():
 
     m0 = 1
 
+    states_str = ['$r$', '$v_r$', '$theta$', '$v_theta$', 'm']
+    control_str = ['$beta$']
     initial_states = [r0, vr0, theta0, vtheta0, m0]
     final_states = [rf, vrf, vthetaf]
 
@@ -192,7 +212,7 @@ def main():
     bound = [[tf_lb, tf_ub], [coeff_lw, coeff_ub]]
 
     direct_single_shooting_method(
-        initial_states, final_states, tf_guess, coeff_guess, nx, N, bound)
+        initial_states, final_states, tf_guess, coeff_guess, nx, N, bound, states_str, nu, control_str)
 
 
 if __name__ == "__main__":
