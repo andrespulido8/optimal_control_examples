@@ -1,5 +1,4 @@
-from email import message
-from re import S
+import time
 from scipy.optimize import root
 from scipy.integrate import odeint
 from scipy.integrate import solve_ivp
@@ -137,6 +136,8 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx, s
     vtheta0 = initial_states[3]
     m0 = initial_states[4]
 
+    start = time.time()
+
     obj_sol = root(objective, guesses[0:-1], method="hybr", tol=1e-4)
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
     print("msg: ", obj_sol.message)
@@ -185,6 +186,10 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx, s
 
     #states_val = np.transpose(sol.y)
     states_val = soly[0:-1, :]
+
+    end = time.time()
+    print('Elapsed time: ', end - start,
+          'seconds, or: ', (end-start)/60, 'minutes')
 
     plot_shooting(time=t_eval, states_val=states_val, states_str=states_str,
                   nx=nx, control_val=control_val, control_str=control_str, nu=nu, control_time=control_time, is_costates='True')

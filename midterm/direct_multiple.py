@@ -1,3 +1,4 @@
+import time
 from scipy.optimize import minimize
 from scipy.integrate import odeint
 from scipy.integrate import solve_ivp
@@ -126,6 +127,8 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
     vtheta0 = initial_states[3]
     m0 = initial_states[4]
 
+    start = time.time()
+
     C_guess = coeff_guess*np.ones((N+1, K))
 
     tau = np.linspace(-1, +1, K+1)
@@ -191,13 +194,17 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
         states_val[points*k:points + points*k,
                    :] = soly[0:-1, :]
 
-    t_array = t0 + (tf-t0)*(tau_array+1)/2
-
     print("beta array shape: ", len(beta_array))
     print("max beta: ", max(beta_array))
 
-    plot_shooting(time=np.reshape(tau_array, K*points), states_val=states_val, states_str=states_str,
-                  nx=nx, control_val=np.reshape(control_val, K*points), control_str=control_str, nu=nu, control_time=np.reshape(tau_array, K*points), is_costates='False')
+    time_s = t0 + (tf-t0)*(np.reshape(tau_array, K*points)+1)/2
+
+    end = time.time()
+    print('Elapsed time: ', end - start,
+          'seconds, or: ', (end-start)/60, 'minutes')
+
+    plot_shooting(time=time_s, states_val=states_val, states_str=states_str,
+                  nx=nx, control_val=np.reshape(control_val, K*points), control_str=control_str, nu=nu, control_time=time_s, is_costates='False')
 
 
 def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates='False'):
@@ -239,9 +246,9 @@ def main():
     nx = 5  # number of states
     nu = 1
 
-    N = 3  # number of degrees for polynomial
+    N = 2  # number of degrees for polynomial
 
-    K = 10
+    K = 6
 
     # Initial conditions
     r0 = 1

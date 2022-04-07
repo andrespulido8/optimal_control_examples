@@ -1,3 +1,4 @@
+import time
 from scipy.optimize import root
 from scipy.integrate import solve_ivp
 import numpy as np
@@ -147,6 +148,8 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
 
     t0 = 0
 
+    start = time.time()
+
     tau = np.linspace(-1, +1, K+1)
 
     ptot0guess = np.ones([2*nx, K-1])
@@ -197,8 +200,14 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
         states_val[points*k:points + points*k,
                    :] = soly[0:-1, :]
 
-    plot_shooting(time=np.reshape(tau_array, K*points), states_val=states_val, states_str=states_str,
-                  nx=nx, control_val=np.reshape(control_val, K*points), control_str=control_str, nu=nu, control_time=np.reshape(tau_array, K*points), is_costates='True')
+    time_s = t0 + (tf-t0)*(np.reshape(tau_array, K*points)+1)/2
+
+    end = time.time()
+    print('Elapsed time: ', end - start,
+          'seconds, or: ', (end-start)/60, 'minutes')
+
+    plot_shooting(time=time_s, states_val=states_val, states_str=states_str,
+                  nx=nx, control_val=np.reshape(control_val, K*points), control_str=control_str, nu=nu, control_time=time_s, is_costates='True')
 
 
 def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates='False'):
@@ -246,7 +255,7 @@ def main():
     states_str = s_str + cs_str
     control_str = ['$beta$']
 
-    K = 10
+    K = 7
 
     # Initial conditions
     r0 = 1

@@ -1,3 +1,4 @@
+import time
 from scipy.optimize import minimize
 from scipy.integrate import odeint
 from scipy.integrate import solve_ivp
@@ -102,6 +103,8 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
     vtheta0 = initial_states[3]
     m0 = initial_states[4]
 
+    start = time.time()
+
     obj_vec = np.vstack((tf_guess, coeff_guess*np.ones((N+1, 1))),)
 
     ineq_cons = {'type': 'ineq',
@@ -112,7 +115,7 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
     bounds = np.append(bound, [bound[1], ]*(N), axis=0)
     obj_sol = minimize(objective, obj_vec, method='SLSQP',
                        constraints=eq_cons, options={
-                           'ftol': 1e-4, 'disp': True},
+                           'ftol': 1e-4, 'disp': True, 'maxiter': 200},
                        bounds=tuple(bounds))
     # r0, vr0, theta0, vtheta, m
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
@@ -139,6 +142,10 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
     control_val = np.degrees(beta_array)
 
     states_val = soly[0:-1, :]
+
+    end = time.time()
+    print('Elapsed time: ', end - start,
+          'seconds, or: ', (end-start)/60, 'minutes')
 
     plot_shooting(time=t_eval, states_val=states_val, states_str=states_str,
                   nx=nx, control_val=control_val, control_str=control_str, nu=nu, control_time=t_eval, is_costates='False')
@@ -183,7 +190,7 @@ def main():
     nx = 5  # number of states
     nu = 1
 
-    N = 10  # number of degrees for polynomial
+    N = 5  # number of degrees for polynomial
 
     # Initial conditions
     r0 = 1
