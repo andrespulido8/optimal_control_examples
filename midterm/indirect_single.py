@@ -1,6 +1,9 @@
+""" Script that solves the optimal control problem for the midterm using indirect single shooting
+    Author: Andres Pulido
+    Date: April 2022
+"""
 import time
 from scipy.optimize import root
-from scipy.integrate import odeint
 from scipy.integrate import solve_ivp
 import numpy as np
 
@@ -8,7 +11,7 @@ import matplotlib.pyplot as plt
 plt.style.use('seaborn-poster')
 
 
-def indirect_single_shooting_method(initial_states, final_states, guesses, nx, states_str, nu, control_str):
+def indirect_single_shooting(initial_states, final_states, guesses, nx, states_str, nu, control_str):
 
     def objective(obj0):
         global beta_array, t_array
@@ -29,30 +32,6 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx, s
         lambtheta = sol.y[7]
         lambvtheta = sol.y[8]
         lambm = sol.y[9]
-
-        # euler forward solver
-        # soly = np.zeros((1000+1, 2*nx))
-        # soly[0, :] = x0
-        # dt = tf/1000
-        # for ii, t in enumerate(t_eval):
-        #    soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii])*dt
-
-        # soly = odeint(dynamics, x0, t_eval, tfirst=True, printmessg=1)
-        # r = soly[:, 0]
-        # vr = soly[:, 1]
-        # theta = soly[:, 2]
-        # vtheta = soly[:, 3]
-        # m = soly[:, 4]
-        # lambr = soly[:, 5]
-        # lambvr = soly[:, 6]
-        # lambtheta = soly[:, 7]
-        # lambvtheta = soly[:, 8]
-        # lambm = soly[:, 9]
-
-        # H = lambr[-1]*vr[-1] + lambvr[-1]*(-mu/r[-1] + vtheta[-1]**2/r[-1] + T*np.sin(beta_array[-1])/m[-1]) + lambtheta[-1] * \
-        #    vtheta[-1]/r[-1] + lambvtheta[-1] * \
-        #    (-vr[-1]*vtheta[-1]/r[-1] + T *
-        #     np.cos(beta_array[-1])/m[-1]) - lambm[-1]*T/ve
 
         x = np.array([r[-1], vr[-1], theta[-1], theta[-1], m[-1]])
         lamb_tf = np.array(
@@ -92,14 +71,6 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx, s
             # print(bt)
             return Hbeta
 
-        # full_output = False
-        # beta = root(
-        #    solve_control, beta_guess, tol=1e-6)
-        # if full_output:
-        #    print("Theta solution found? ",
-        #          "yes!" if beta.success == 1 else "No :(")
-        #    print("msg: ", beta.message)
-        # beta = beta.x[0]  # np.clip(beta.x, -np.pi/2, np.pi/2)
         beta = np.arctan2(lambvr_t, lambvtheta_t)
 
         beta_array.append(beta)
@@ -142,10 +113,6 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx, s
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
     print("msg: ", obj_sol.message)
     print("n func calls: ", obj_sol.nfev)
-    # obj_sol = root(objective, obj_sol.x, method="hybr", tol=1e-8)
-    # print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
-    # print("msg: ", obj_sol.message)
-    # print("n func calls: ", obj_sol.nfev)
 
     obj_sol = obj_sol.x
 
@@ -157,8 +124,6 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx, s
     tf = obj_sol[nx]
     t_eval = np.linspace(0, tf, 1000)
 
-    #sol = solve_ivp(dynamics, [0, tf], sol_initial_states, t_eval=t_eval)
-
     # euler forward solver
     soly = np.zeros((1000+1, 2*nx))
     soly[0, :] = sol_initial_states
@@ -166,21 +131,8 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx, s
     for ii, t in enumerate(t_eval):
         soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii])*dt
 
-    # soly = odeint(dynamics, x0, t_eval, tfirst=True, printmessg=1)
-    # r = soly[:, 0]
-    # vr = soly[:, 1]
-    # theta = soly[:, 2]
-    # vtheta = soly[:, 3]
-    # m = soly[:, 4]
-
     print("beta array shape: ", len(beta_array))
     print("max beta: ", max(beta_array))
-    #aa = np.array(t_array)
-    #bb = np.degrees(beta_array)[:]
-    #control = np.array([aa, bb])
-    #sortedCon = control[:, control[0].argsort()]
-    #control_val = sortedCon[1]
-    #control_time = sortedCon[0]
     control_val = np.degrees(beta_array)
     control_time = np.array(t_array)
 
@@ -190,6 +142,8 @@ def indirect_single_shooting_method(initial_states, final_states, guesses, nx, s
     end = time.time()
     print('Elapsed time: ', end - start,
           'seconds, or: ', (end-start)/60, 'minutes')
+    print("tf: ", t_eval[-1])
+    print("m(tf): ", states_val[-1, -1])
 
     plot_shooting(time=t_eval, states_val=states_val, states_str=states_str,
                   nx=nx, control_val=control_val, control_str=control_str, nu=nu, control_time=control_time, is_costates='True')
@@ -202,8 +156,6 @@ def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu
     """
     fig1, axs1 = plt.subplots(nx)
     fig1.suptitle("State evolution of {} ".format(states_str[0:nx]))
-    #fig2, axs2 = plt.subplots(nu)
-    #fig2.suptitle("State evolution of {} ".format(control_str))
     for jj in range(nx):
         axs1[jj].plot(time, states_val[:, jj])
         axs1[jj].set_ylabel(states_str[jj])
@@ -265,7 +217,7 @@ def main():
 
     guesses = lamb0_guess + tf_guess + beta_guess  # list of element guesses
 
-    indirect_single_shooting_method(
+    indirect_single_shooting(
         initial_states, final_states, guesses, nx, states_str, nu, control_str)
 
 

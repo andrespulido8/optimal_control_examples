@@ -1,7 +1,10 @@
+""" Script that solves the optimal control problem for the midterm using direct single shooting
+    Author: Andres Pulido
+    Date: April 2022
+"""
+
 import time
 from scipy.optimize import minimize
-from scipy.integrate import odeint
-from scipy.integrate import solve_ivp
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -10,18 +13,13 @@ plt.style.use('seaborn-poster')
 
 def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_guess, nx, N, bound, states_str, nu, control_str):
 
-    def nonlinear_inequality(obj0):
+    def nonlinear_equality(obj0):
+        """ Nonlinear equality constraint for the optimization function. The equality is the difference in the final states
+            and the boundary condition
+        """
         global beta_array, t_array, m_tf
         tf = obj0[0]
         t_eval = np.linspace(0, tf, 1000)
-
-        # solve_ivp solver
-        # sol = solve_ivp(dynamics, [0, tf], initial_states, t_eval=t_eval, method='Radau', args=(obj_vec[1:],))
-        # r = sol.y[0]
-        # vr = sol.y[1]
-        # theta = sol.y[2]
-        # vtheta = sol.y[3]
-        # m = sol.y[4]
 
         # euler forward solver
         soly = np.zeros((1000+1, nx))
@@ -30,7 +28,6 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
         for ii, t in enumerate(t_eval):
             soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii], obj0[1:])*dt
 
-        # soly = odeint(dynamics, initial_states, t_eval, tfirst=True, printmessg=1)
         r = soly[:, 0]
         vr = soly[:, 1]
         vtheta = soly[:, 3]
@@ -72,21 +69,9 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
         return np.array([r_dot, vr_dot, theta_dot, vtheta_dot, m_dot])
 
     def objective(obj):
-        tf = obj[0]
-        #t_eval = np.linspace(0, tf, 1000)
-
-        # euler forward solver
-        #soly = np.zeros((1000+1, nx))
-        #soly[0, :] = initial_states
-        #dt = tf/1000
-        # for ii, t in enumerate(t_eval):
-        #    soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii], obj[1:])*dt
-
-        #m_tf = soly[:, 4][-1]
-
-        # return -obj_vec[0]
-        #print("Coefficients: ", obj[1:])
-        #print('tf: ', obj[0])
+        """ Cost function for the optimization function, in this problem is the
+            maximization of the final mass 
+        """
         return -m_tf
 
     global beta_array, t_array
@@ -97,36 +82,24 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
     rf = final_states[0]
     vrf = final_states[1]
     vthetaf = final_states[2]
-    r0 = initial_states[0]
-    vr0 = initial_states[1]
-    theta0 = initial_states[2]
-    vtheta0 = initial_states[3]
-    m0 = initial_states[4]
 
     start = time.time()
 
     obj_vec = np.vstack((tf_guess, coeff_guess*np.ones((N+1, 1))),)
 
-    ineq_cons = {'type': 'ineq',
-                 'fun': []}
-
-    eq_cons = {'type': 'eq', 'fun': nonlinear_inequality}
+    eq_cons = {'type': 'eq', 'fun': nonlinear_equality}
 
     bounds = np.append(bound, [bound[1], ]*(N), axis=0)
     obj_sol = minimize(objective, obj_vec, method='SLSQP',
                        constraints=eq_cons, options={
                            'ftol': 1e-4, 'disp': True, 'maxiter': 200},
                        bounds=tuple(bounds))
-    # r0, vr0, theta0, vtheta, m
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
     print("msg: ", obj_sol.message)
     print("n func calls: ", obj_sol.nfev)
     obj_sol = obj_sol.x
 
     tf = obj_sol[0]
-
-    # sol = solve_ivp(dynamics, [0, tf], initial_states,
-    #                t_eval=t_eval, args=(obj_sol[1:],))
 
     # euler forward solver
     points = 1000
@@ -137,15 +110,15 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
     for ii, t in enumerate(t_eval):
         soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii], obj_sol[1:])*dt
 
-    print("beta array shape: ", len(beta_array))
-    print("max beta: ", max(beta_array))
     control_val = np.degrees(beta_array)
-
     states_val = soly[0:-1, :]
 
     end = time.time()
+
     print('Elapsed time: ', end - start,
           'seconds, or: ', (end-start)/60, 'minutes')
+    print("tf: ", t_eval[-1])
+    print("m(tf): ", states_val[-1, -1])
 
     plot_shooting(time=t_eval, states_val=states_val, states_str=states_str,
                   nx=nx, control_val=control_val, control_str=control_str, nu=nu, control_time=t_eval, is_costates='False')
@@ -190,7 +163,7 @@ def main():
     nx = 5  # number of states
     nu = 1
 
-    N = 5  # number of degrees for polynomial
+    N = 10  # number of degrees for polynomial
 
     # Initial conditions
     r0 = 1

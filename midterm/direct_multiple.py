@@ -1,6 +1,10 @@
+""" Script that solves the optimal control problem for the midterm using direct multiple shooting
+    Author: Andres Pulido
+    Date: April 2022
+"""
+
 import time
 from scipy.optimize import minimize
-from scipy.integrate import odeint
 from scipy.integrate import solve_ivp
 import numpy as np
 
@@ -9,13 +13,21 @@ plt.style.use('seaborn-poster')
 
 
 def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coeff_guess, nx, N, K, bound, states_str, nu, control_str):
+    """Solves a optimal control problem with the multiple shooting method
+    """
 
-    def nonlinear_inequality(obj0):
+    def nonlinear_equality(obj0):
+        """ Nonlinear equality constraint for the optimization function. The equality is the difference in the final states and the initial
+            states in the next partition and the difference between the final states at the final partition and the boundary condition
+        """
         global beta_array, t_array, m_tf
         tf = obj0[0]
         points = 100
+        # initial states at the beginning of each partition
         ptot0 = np.reshape(obj0[(N+1)*K+1:], [nx, K-1])
+        # coefficient polynomials for every partition
         C_0 = np.reshape(obj0[1:(N+1)*K+1], (N+1, K))
+        # matrix for the difference of each partition
         E_array = np.empty([K-1, nx])
 
         for k in range(K):
@@ -23,21 +35,6 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
                 p0 = initial_states
             else:
                 p0 = ptot0[:, k-1]
-
-            #tau_eval = np.linspace(tau[k], tau[k+1], points)
-
-            # euler forward solver
-            #soly = np.zeros((points+1, nx))
-            #soly[0, :] = initial_states
-            #dt = tf/points
-            # for ii, t in enumerate(tau_eval):
-            #    soly[ii+1, :] = soly[ii] + \
-            #        dynamics(t, soly[ii], t0, tf, C_0[:, k])*dt
-            #r = soly[:, 0]
-            #vr = soly[:, 1]
-            #theta = soly[:, 2]
-            #vtheta = soly[:, 3]
-            #m = soly[:, 4]
 
             sol = solve_ivp(dynamics, [tau[k], tau[k+1]], p0,
                             args=(t0, tf, C_0[:, k]), method='Radau')
@@ -82,7 +79,8 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
         vtheta_t = s[3]
         m_t = s[4]
 
-        beta = np.polynomial.polynomial.polyval(t, coeff, )
+        beta = np.polynomial.polynomial.polyval(
+            t, coeff, )  # polynomial of degree N
 
         beta_array.append(beta)
         t_array.append(t)
@@ -97,20 +95,9 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
         return (tfinal-tinitial)*derivatives/2
 
     def objective(obj, t0):
-        #t_eval = np.linspace(0, tf, 1000)
-
-        # euler forward solver
-        #soly = np.zeros((1000+1, nx))
-        #soly[0, :] = initial_states
-        #dt = tf/1000
-        # for ii, t in enumerate(t_eval):
-        #    soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii], obj[1:])*dt
-
-        #m_tf = soly[:, 4][-1]
-
-        # return -obj_vec[0]
-        #print("Coefficients: ", obj[1:])
-        #print('tf: ', obj[0])
+        """ Cost function for the optimization function, in this problem is the
+            maximization of the final mass (scaled to be in interval -1 to 1)
+        """
         return -(t0-obj[0])*m_tf/2
 
     global beta_array, t_array
@@ -118,14 +105,10 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
     beta_array = []
     t_array = []
 
+    # Boundary condition at the final time
     rf = final_states[0]
     vrf = final_states[1]
     vthetaf = final_states[2]
-    r0 = initial_states[0]
-    vr0 = initial_states[1]
-    theta0 = initial_states[2]
-    vtheta0 = initial_states[3]
-    m0 = initial_states[4]
 
     start = time.time()
 
@@ -136,23 +119,21 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
 
     ptot0guess = np.ones([nx, K-1])
     reshaped = np.reshape(ptot0guess, nx*(K-1))
-    cres = np.reshape(C_guess, (N+1)*K)
-    obj_vec = np.hstack((tf_guess, cres, reshaped))
 
-    ineq_cons = {'type': 'ineq',
-                 'fun': []}
+    # Decision vector (final time, initial states at the partitions and coefficients)
+    obj_vec = np.hstack((tf_guess, np.reshape(C_guess, (N+1)*K), reshaped))
 
-    eq_cons = {'type': 'eq', 'fun': nonlinear_inequality}
+    eq_cons = {'type': 'eq', 'fun': nonlinear_equality}
 
     bounds = np.append([bound[0]], [bound[1], ]*(N+1)
-                       * K, axis=0)  # bounds for c
+                       * K, axis=0)  # bounds for the coefficients
     bounds = np.append(bounds, [bound[2], ]*nx *
-                       (K-1), axis=0)  # bounds for states
+                       (K-1), axis=0)  # bounds for iniital states at each partition
+
     obj_sol = minimize(objective, obj_vec, method='SLSQP',
                        constraints=eq_cons, options={
                            'ftol': 1e-4, 'disp': True},
                        bounds=tuple(bounds), args=(t0))
-    # r0, vr0, theta0, vtheta, m
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
     print("msg: ", obj_sol.message)
     print("n func calls: ", obj_sol.nfev)
@@ -164,8 +145,6 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
     ptot0 = np.reshape(obj_sol[(N+1)*K+1:], [nx, K-1])
     points = 1000
     tau_array = np.empty([K, points])
-    r_array = np.empty([K, points])
-    theta_array = np.empty([K, points])
     control_val = np.empty([K, points])
     states_val = np.empty([K*points, nx])
 
@@ -175,33 +154,30 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
         else:
             p0 = ptot0[:, k-1]
         tau_eval = np.linspace(tau[k], tau[k+1], points)
-        # sol = solve_ivp(dynamics, [tau_eval[0], tau_eval[-1]],
-        #                p0, t_eval=tau_eval, args=(t0, tf, C[:, k]), dense_output=True)
-        #tau_array[k] = sol.t
-        #r_array[k] = sol.y[0]
-        #theta_array[k] = sol.y[2]
 
-        soly = np.zeros((points+1, nx))
+        soly = np.zeros((points+1, nx))  # matrix of solution
         soly[0, :] = p0
         dt = (tau[k+1] - tau[k])/points
+
         for ii, t in enumerate(tau_eval):
             soly[ii+1, :] = soly[ii] + \
                 dynamics(t, soly[ii], t0, tf, C[:, k])*dt
+
+        # Collect values of each partition to plot
         control_val[k] = beta_array[0:points]
         tau_array[k] = tau_eval
-        r_array[k] = soly[0:-1, 0]
-        theta_array[k] = soly[0:-1, 2]
         states_val[points*k:points + points*k,
                    :] = soly[0:-1, :]
 
-    print("beta array shape: ", len(beta_array))
-    print("max beta: ", max(beta_array))
-
+    # Scale back time from (-1, 1) to (t0, tf)
     time_s = t0 + (tf-t0)*(np.reshape(tau_array, K*points)+1)/2
 
     end = time.time()
+
     print('Elapsed time: ', end - start,
           'seconds, or: ', (end-start)/60, 'minutes')
+    print("tf: ", time_s[-1])
+    print("m(tf): ", states_val[-1, -1])
 
     plot_shooting(time=time_s, states_val=states_val, states_str=states_str,
                   nx=nx, control_val=np.reshape(control_val, K*points), control_str=control_str, nu=nu, control_time=time_s, is_costates='False')
@@ -246,9 +222,9 @@ def main():
     nx = 5  # number of states
     nu = 1
 
-    N = 2  # number of degrees for polynomial
+    N = 6  # number of degrees for polynomial
 
-    K = 6
+    K = 7
 
     # Initial conditions
     r0 = 1
@@ -261,8 +237,10 @@ def main():
 
     m0 = 1
 
-    states_str = ['$r$', '$v_r$', '$theta$', '$v_theta$', 'm']
+    # Strings to plot
+    states_str = ['$r$', '$v_r$', '$theta$', '$v theta$', 'm']
     control_str = ['$beta$']
+
     initial_states = [r0, vr0, theta0, vtheta0, m0]
     final_states = [rf, vrf, vthetaf]
 

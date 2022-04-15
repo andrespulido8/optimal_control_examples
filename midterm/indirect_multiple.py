@@ -1,3 +1,8 @@
+""" Script that solves the optimal control problem for the midterm using indirect multiple shooting
+    Author: Andres Pulido
+    Date: April 2022
+"""
+
 import time
 from scipy.optimize import root
 from scipy.integrate import solve_ivp
@@ -10,13 +15,15 @@ plt.style.use('seaborn-poster')
 def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, nu, control_str, is_print=False):
 
     def objective(obj0):
+        """ Objective of the root finder function. The equality is the difference between the states at the end of 
+            a partition and the initial states at the beginning of the next partition, and the transversality conditions
+        """
         if is_print:
             print("\nDecision vector: ", obj0)
 
         global beta_array, t_array
         tf = obj0[nx]
         ptot0 = np.reshape(obj0[nx+1:], [2*nx, K-1])
-        #points = 1000
         E_array = np.empty([K-1, nx*2])
 
         for k in range(K):
@@ -25,8 +32,6 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
                       obj0[1], obj0[2], obj0[3], obj0[4]]
             else:
                 p0 = ptot0[:, k-1]
-
-            #tau_eval = np.linspace(tau[k], tau[k+1], points)
 
             sol = solve_ivp(dynamics, [tau[k], tau[k+1]], p0,
                             args=(t0, tf), method='Radau')
@@ -58,10 +63,10 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
                                  eq5k, eq6k, eq7k, eq8k, eq9k, eq10k]
                 #print([eq1k, eq2k, eq3k, eq4k, eq5k, eq6k, eq7k, eq8k, eq9k, eq10k])
 
-        x = np.array([r[-1], vr[-1], theta[-1], theta[-1], m[-1]])
+        x_tf = np.array([r[-1], vr[-1], theta[-1], theta[-1], m[-1]])
         lamb_tf = np.array(
             [lambr[-1], lambvr[-1], lambtheta[-1], lambvtheta[-1], lambm[-1]])
-        comb = np.concatenate((x, lamb_tf), axis=0)
+        comb = np.concatenate((x_tf, lamb_tf), axis=0)
         H = np.matmul(lamb_tf, dynamics(tf, comb, 0, tf)[5:])
 
         beta_array = []
@@ -95,19 +100,6 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
         lambvtheta_t = s[8]
         lambm_t = s[9]
 
-        def solve_control(bt):
-            Hbeta = lambvr_t*T*np.cos(bt)/m_t - lambvtheta_t*T*np.sin(bt)/m_t
-            # print(bt)
-            return Hbeta
-
-        #full_output = False
-        # beta = root(
-        #    solve_control, beta_guess, tol=1e-6)
-        # if full_output:
-        #    print("Theta solution found? ",
-        #          "yes!" if beta.success == 1 else "No :(")
-        #    print("msg: ", beta.message)
-        # beta = beta.x[0]  # np.clip(beta.x, -np.pi/2, np.pi/2)
         beta = np.arctan2(lambvr_t, lambvtheta_t)
 
         beta_array.append(beta)
@@ -133,7 +125,6 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
 
     global beta_array, t_array
 
-    beta_guess = guesses[-1]
     beta_array = []
     t_array = []
 
@@ -154,6 +145,8 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
 
     ptot0guess = np.ones([2*nx, K-1])
     reshaped = np.reshape(ptot0guess, 2*nx*(K-1))
+
+    # Decision vector: the initial states at each partition
     changing = np.concatenate(([guesses[0:nx+1], reshaped]))
 
     obj_sol = root(objective, changing, method="hybr", tol=1e-4)
@@ -163,14 +156,10 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
 
     obj_sol = obj_sol.x
 
-    _ = objective(obj_sol)
-
     tf = obj_sol[nx]
     ptot0 = np.reshape(obj_sol[nx+1:], [2*nx, K-1])
     points = 1000
     tau_array = np.empty([K, points])
-    r_array = np.empty([K, points])
-    theta_array = np.empty([K, points])
     control_val = np.empty([K, points])
     states_val = np.empty([K*points, 2*nx])
 
@@ -182,29 +171,27 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
             p0 = ptot0[:, k-1]
         tau_eval = np.linspace(tau[k], tau[k+1], points)
 
-        # sol = solve_ivp(dynamics, [tau_eval[0], tau_eval[-1]],
-        #                p0, t_eval=tau_eval, args=(t0, tf), dense_output=True)
-        #tau_array[k] = sol.t
-        #r_array[k] = sol.y[0]
-        #theta_array[k] = sol.y[2]
-
         soly = np.zeros((points+1, 2*nx))
         soly[0, :] = p0
         dt = (tau[k+1] - tau[k])/points
         for ii, t in enumerate(tau_eval):
             soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii], t0, tf)*dt
+
+        # Collect values of each partition to plot
         control_val[k] = beta_array[0:points]
         tau_array[k] = tau_eval
-        r_array[k] = soly[0:-1, 0]
-        theta_array[k] = soly[0:-1, 2]
         states_val[points*k:points + points*k,
                    :] = soly[0:-1, :]
 
+    # Scale back time from (-1, 1) to (t0, tf)
     time_s = t0 + (tf-t0)*(np.reshape(tau_array, K*points)+1)/2
 
     end = time.time()
+
     print('Elapsed time: ', end - start,
           'seconds, or: ', (end-start)/60, 'minutes')
+    print("tf: ", time_s[-1])
+    print("m(tf): ", states_val[-1, -1])
 
     plot_shooting(time=time_s, states_val=states_val, states_str=states_str,
                   nx=nx, control_val=np.reshape(control_val, K*points), control_str=control_str, nu=nu, control_time=time_s, is_costates='True')
@@ -255,7 +242,7 @@ def main():
     states_str = s_str + cs_str
     control_str = ['$beta$']
 
-    K = 7
+    K = 20
 
     # Initial conditions
     r0 = 1
