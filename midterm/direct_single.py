@@ -85,7 +85,7 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
 
     start = time.time()
 
-    obj_vec = np.vstack((tf_guess, coeff_guess*np.ones((N+1, 1))),)
+    obj_vec = np.vstack(([tf_guess], coeff_guess*np.ones((N+1, 1))),)
 
     eq_cons = {'type': 'eq', 'fun': nonlinear_equality}
 
@@ -121,10 +121,10 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
     print("m(tf): ", states_val[-1, -1])
 
     plot_shooting(time=t_eval, states_val=states_val, states_str=states_str,
-                  nx=nx, control_val=control_val, control_str=control_str, nu=nu, control_time=t_eval, is_costates='False')
+                  nx=nx, control_val=control_val, control_str=control_str, nu=nu, control_time=t_eval, is_costates=False)
 
 
-def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates='False'):
+def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates=False):
     """ Plots all states, all costates (if is_costate == True), the beta control and the orbit transfer in polar coord.
         nx - number of states
         nu - number of controls
@@ -136,13 +136,13 @@ def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu
     for jj in range(nx):
         axs1[jj].plot(time, states_val[:, jj])
         axs1[jj].set_ylabel(states_str[jj])
-    if is_costates == True:
+    if is_costates:
         fig3, axs3 = plt.subplots(nx)
         fig3.suptitle("Co-state evolution of {} ".format(states_str[nx:]))
         for jj in range(nx):
             axs3[jj].plot(time, states_val[:, nx+jj])
             axs3[jj].set_ylabel(states_str[nx+jj])
-    axs2.scatter(control_time, control_val)
+    axs2.plot(control_time, control_val)
     axs2.set_ylabel(control_str[0])
     plt.xlabel("time [s]")
     plt.show()
@@ -163,7 +163,7 @@ def main():
     nx = 5  # number of states
     nu = 1
 
-    N = 10  # number of degrees for polynomial
+    N = 19  # number of degrees for polynomial
 
     # Initial conditions
     r0 = 1
@@ -181,7 +181,7 @@ def main():
     initial_states = [r0, vr0, theta0, vtheta0, m0]
     final_states = [rf, vrf, vthetaf]
 
-    tf_guess = [4]
+    tf_guess = 4
     tf_ub = 5
     tf_lb = 1
 

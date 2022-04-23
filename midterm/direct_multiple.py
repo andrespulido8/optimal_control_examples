@@ -121,7 +121,7 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
     reshaped = np.reshape(ptot0guess, nx*(K-1))
 
     # Decision vector (final time, initial states at the partitions and coefficients)
-    obj_vec = np.hstack((tf_guess, np.reshape(C_guess, (N+1)*K), reshaped))
+    obj_vec = np.hstack(([tf_guess], np.reshape(C_guess, (N+1)*K), reshaped))
 
     eq_cons = {'type': 'eq', 'fun': nonlinear_equality}
 
@@ -162,12 +162,12 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
         for ii, t in enumerate(tau_eval):
             soly[ii+1, :] = soly[ii] + \
                 dynamics(t, soly[ii], t0, tf, C[:, k])*dt
-
         # Collect values of each partition to plot
         control_val[k] = beta_array[0:points]
         tau_array[k] = tau_eval
         states_val[points*k:points + points*k,
                    :] = soly[0:-1, :]
+        beta_array = []
 
     # Scale back time from (-1, 1) to (t0, tf)
     time_s = t0 + (tf-t0)*(np.reshape(tau_array, K*points)+1)/2
@@ -180,10 +180,10 @@ def direct_multiple_shooting_method(initial_states, final_states, tf_guess, coef
     print("m(tf): ", states_val[-1, -1])
 
     plot_shooting(time=time_s, states_val=states_val, states_str=states_str,
-                  nx=nx, control_val=np.reshape(control_val, K*points), control_str=control_str, nu=nu, control_time=time_s, is_costates='False')
+                  nx=nx, control_val=np.reshape(control_val, K*points), control_str=control_str, nu=nu, control_time=time_s, is_costates=False)
 
 
-def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates='False'):
+def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates=False):
     """ Plots all states, all costates (if is_costate == True), the beta control and the orbit transfer in polar coord.
         nx - number of states
         nu - number of controls
@@ -195,7 +195,7 @@ def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu
     for jj in range(nx):
         axs1[jj].plot(time, states_val[:, jj])
         axs1[jj].set_ylabel(states_str[jj])
-    if is_costates == True:
+    if is_costates:
         fig3, axs3 = plt.subplots(nx)
         fig3.suptitle("Co-state evolution of {} ".format(states_str[nx:]))
         for jj in range(nx):
@@ -244,7 +244,7 @@ def main():
     initial_states = [r0, vr0, theta0, vtheta0, m0]
     final_states = [rf, vrf, vthetaf]
 
-    tf_guess = [4]
+    tf_guess = 4
     tf_ub = 5
     tf_lb = 1
 

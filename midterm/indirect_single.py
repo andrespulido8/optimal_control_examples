@@ -2,6 +2,7 @@
     Author: Andres Pulido
     Date: April 2022
 """
+
 import time
 from scipy.optimize import root
 from scipy.integrate import solve_ivp
@@ -94,7 +95,6 @@ def indirect_single_shooting(initial_states, final_states, guesses, nx, states_s
 
     global beta_array, t_array
 
-    beta_guess = guesses[-1]
     beta_array = []
     t_array = []
 
@@ -109,7 +109,7 @@ def indirect_single_shooting(initial_states, final_states, guesses, nx, states_s
 
     start = time.time()
 
-    obj_sol = root(objective, guesses[0:-1], method="hybr", tol=1e-4)
+    obj_sol = root(objective, guesses[0:-1], method="hybr", tol=1e-4,)
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
     print("msg: ", obj_sol.message)
     print("n func calls: ", obj_sol.nfev)
@@ -146,10 +146,10 @@ def indirect_single_shooting(initial_states, final_states, guesses, nx, states_s
     print("m(tf): ", states_val[-1, -1])
 
     plot_shooting(time=t_eval, states_val=states_val, states_str=states_str,
-                  nx=nx, control_val=control_val, control_str=control_str, nu=nu, control_time=control_time, is_costates='True')
+                  nx=nx, control_val=control_val, control_str=control_str, nu=nu, control_time=control_time, is_costates=True)
 
 
-def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates='False'):
+def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates=False):
     """ Plots all states, all costates (if is_costate == True), the beta control and the orbit transfer in polar coord.
         nx - number of states
         nu - number of controls
@@ -159,7 +159,7 @@ def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu
     for jj in range(nx):
         axs1[jj].plot(time, states_val[:, jj])
         axs1[jj].set_ylabel(states_str[jj])
-    if is_costates == True:
+    if is_costates:
         fig3, axs3 = plt.subplots(nx)
         fig3.suptitle("Co-state evolution of {} ".format(states_str[nx:]))
         for jj in range(nx):

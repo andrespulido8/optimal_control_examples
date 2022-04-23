@@ -63,7 +63,7 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
                                  eq5k, eq6k, eq7k, eq8k, eq9k, eq10k]
                 #print([eq1k, eq2k, eq3k, eq4k, eq5k, eq6k, eq7k, eq8k, eq9k, eq10k])
 
-        x_tf = np.array([r[-1], vr[-1], theta[-1], theta[-1], m[-1]])
+        x_tf = np.array([r[-1], vr[-1], theta[-1], vtheta[-1], m[-1]])
         lamb_tf = np.array(
             [lambr[-1], lambvr[-1], lambtheta[-1], lambvtheta[-1], lambm[-1]])
         comb = np.concatenate((x_tf, lamb_tf), axis=0)
@@ -149,7 +149,7 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
     # Decision vector: the initial states at each partition
     changing = np.concatenate(([guesses[0:nx+1], reshaped]))
 
-    obj_sol = root(objective, changing, method="hybr", tol=1e-4)
+    obj_sol = root(objective, changing, method="hybr", tol=1e-8)
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
     print("msg: ", obj_sol.message)
     print("n func calls: ", obj_sol.nfev)
@@ -178,13 +178,14 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
             soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii], t0, tf)*dt
 
         # Collect values of each partition to plot
-        control_val[k] = beta_array[0:points]
+        control_val[k] = beta_array
         tau_array[k] = tau_eval
         states_val[points*k:points + points*k,
                    :] = soly[0:-1, :]
+        beta_array = []
 
     # Scale back time from (-1, 1) to (t0, tf)
-    time_s = t0 + (tf-t0)*(np.reshape(tau_array, K*points)+1)/2
+    time_s = t0 + (tf-t0)*(np.reshape(tau_array, K*points) + 1)/2
 
     end = time.time()
 
@@ -194,10 +195,10 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
     print("m(tf): ", states_val[-1, -1])
 
     plot_shooting(time=time_s, states_val=states_val, states_str=states_str,
-                  nx=nx, control_val=np.reshape(control_val, K*points), control_str=control_str, nu=nu, control_time=time_s, is_costates='True')
+                  nx=nx, control_val=np.degrees(np.reshape(control_val, K*points)), control_str=control_str, nu=nu, control_time=time_s, is_costates=True)
 
 
-def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates='False'):
+def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates=False):
     """ Plots all states, all costates (if is_costate == True), the beta control and the orbit transfer in polar coord.
         nx - number of states
         nu - number of controls
@@ -209,7 +210,7 @@ def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu
     for jj in range(nx):
         axs1[jj].plot(time, states_val[:, jj])
         axs1[jj].set_ylabel(states_str[jj])
-    if is_costates == True:
+    if is_costates:
         fig3, axs3 = plt.subplots(nx)
         fig3.suptitle("Co-state evolution of {} ".format(states_str[nx:]))
         for jj in range(nx):
@@ -237,12 +238,12 @@ def main():
     nu = 1  # number of controls
 
     s_str = ['$r$', '$v_r$', '$theta$', '$v_theta$', 'm']
-    cs_str = ['$\lambda_r$', '$\lambda_vr$',
-              '$\lambda_theta$', '$\lambda v_theta$', '$\lambda_m$']
+    cs_str = ['$lambda_r$', '$lambda_vr$',
+              '$lambda_theta$', '$lambda v_theta$', '$lambda_m$']
     states_str = s_str + cs_str
     control_str = ['$beta$']
 
-    K = 20
+    K = 15
 
     # Initial conditions
     r0 = 1
