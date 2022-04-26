@@ -1,4 +1,4 @@
-""" Script that solves the optimal control problem for the midterm using direct multiple shooting
+""" Script that solves the optimal control problem for the Orbit-Transfer problem using direct multiple shooting
     Author: Andres Pulido
     Date: April 2022
 """

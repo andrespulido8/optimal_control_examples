@@ -1,4 +1,4 @@
-""" Script that solves the optimal control problem for the project problem 1 using direct single shooting
+""" Script that solves the optimal control problem for the Mobile Robot problem using direct single shooting
     Author: Andres Pulido
     Date: April 2022
 """

@@ -1,4 +1,4 @@
-""" Script that solves the optimal control problem for the project problem 2 using direct multiple shooting
+""" Script that solves the optimal control problem for the RObot Arm problem using direct multiple shooting
     Author: Andres Pulido
     Date: April 2022
 """

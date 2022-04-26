@@ -1,4 +1,4 @@
-""" Script that solves the optimal control problem for the project problem 1 using direct multiple shooting
+""" Script that solves the optimal control problem for the Mobile Robot problem using direct multiple shooting
     Author: Andres Pulido
     Date: April 2022
 """
@@ -68,11 +68,6 @@ def direct_multiple_shooting_method(initial_states, final_states, states_guess, 
         theta_t = s[2]
 
         u = np.clip(np.tanh(coeff[0]) + coeff[1], -1, 1)
-        #u = np.polynomial.polynomial.polyval(t, coeff)
-        # u = np.clip(np.polynomial.polynomial.polyval(
-        #    t, coeff), -1, 1)
-        # 1 if np.polynomial.polynomial.polyval(
-        #    t, coeff) > 0 else -1  # polynomial of degree N
 
         u_array.append(u)
         t_array.append(t)
