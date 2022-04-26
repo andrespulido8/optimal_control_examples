@@ -1,9 +1,8 @@
-""" Script that solves the optimal control problem for the project using indirect single shooting
+""" Script that solves the optimal control problem for the project problem 1 using indirect single shooting
     Author: Andres Pulido
     Date: April 2022
 """
 
-from re import U
 import time
 from scipy.optimize import root
 from scipy.integrate import solve_ivp
@@ -39,7 +38,7 @@ def indirect_single_shooting(initial_states, final_states, guesses, nx, states_s
         lamb_tf = np.array(
             [lambx[-1], lamby[-1], lambtheta[-1]])
         comb = np.concatenate((q, lamb_tf), axis=0)
-        H = np.matmul(lamb_tf, dynamics(tf, comb)[nx:])
+        H = np.matmul(lamb_tf, dynamics(tf, comb)[:nx])
 
         u_array = []
         t_array = []
@@ -92,7 +91,7 @@ def indirect_single_shooting(initial_states, final_states, guesses, nx, states_s
 
     start = time.time()
 
-    obj_sol = root(objective, guesses[0:-1], method="hybr", tol=1e-3,)
+    obj_sol = root(objective, guesses[0:-1], method="hybr", tol=5*1e-3,)
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
     print("msg: ", obj_sol.message)
     print("n func calls: ", obj_sol.nfev)
@@ -130,7 +129,7 @@ def indirect_single_shooting(initial_states, final_states, guesses, nx, states_s
 
 
 def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates=False):
-    """ Plots all states, all costates (if is_costate == True), the beta control and the orbit transfer in polar coord.
+    """ Plots all states, all costates (if is_costate == True) and the 'u' control 
         nx - number of states
         nu - number of controls
     """
@@ -153,6 +152,11 @@ def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu
     plt.ylabel(control_str[0])
     plt.xlabel("time [s]")
     plt.title(f'Control evolution')
+    plt.show()
+
+    plt.scatter(states_val[:, 0], states_val[:, 1], c=time, s=1.5)
+    plt.xlabel("x")
+    plt.ylabel("y")
     plt.show()
 
 

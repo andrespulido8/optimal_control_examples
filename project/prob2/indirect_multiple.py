@@ -1,4 +1,4 @@
-""" Script that solves the optimal control problem for the project using indirect multiple shooting
+""" Script that solves the optimal control problem for the project problem 2 using indirect multiple shooting
     Author: Andres Pulido
     Date: April 2022
 """
@@ -21,7 +21,7 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
         if is_print:
             print("\nDecision vector: ", obj0)
 
-        global u_array, t_array
+        global u1_array, u2_array, u3_array, t_array
         tf = obj0[nx]
 
         ptot0 = np.reshape(obj0[nx+1:], [2*nx, K-1])
@@ -29,90 +29,92 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
 
         for k in range(K):
             if k == 0:
-                p0 = [x0, y0, theta0, obj0[0], obj0[1], obj0[2]]
+                p0 = np.concatenate((initial_states, obj0[:nx]))
             else:
                 p0 = ptot0[:, k-1]
 
             sol = solve_ivp(dynamics, [tau[k], tau[k+1]], p0,
-                            args=(t0, tf), method='Radau')
-
-            x = sol.y[0]
-            y = sol.y[1]
-            theta = sol.y[2]
-            lambx = sol.y[3]
-            lamby = sol.y[4]
-            lambtheta = sol.y[5]
+                            args=(t0, tf), method='Radau', t_eval=np.linspace(tau[k], tau[k+1], 50))
 
             if k < K-1:
                 ptots_end = ptot0[:, k]
-                eq1k = x[-1] - ptots_end[0]
-                eq2k = y[-1] - ptots_end[1]
-                eq3k = theta[-1] - ptots_end[2]
-                eq4k = lambx[-1] - ptots_end[3]
-                eq5k = lamby[-1] - ptots_end[4]
-                eq6k = lambtheta[-1] - ptots_end[5]
-                E_array[k, :] = [eq1k, eq2k, eq3k, eq4k, eq5k, eq6k]
+                E_array[k, :] = sol.y[:, -1] - ptots_end
                 #print([eq1k, eq2k, eq3k, eq4k, eq5k, eq6k])
 
-        q_tf = np.array([x[-1], y[-1], theta[-1]])
-        lamb_tf = np.array(
-            [lambx[-1], lamby[-1], lambtheta[-1]])
-        comb = np.concatenate((q_tf, lamb_tf), axis=0)
-        H = np.matmul(lamb_tf, dynamics(tf, comb, 0, tf)[nx:])
+        q_end = sol.y[:, -1]
+        # Dot product of lambda and the derivatives of the states
+        H_tf = np.dot(q_end[nx:], dynamics(tf, q_end, t0, tf)[:nx])
 
-        u_array = []
+        u1_array = []
+        u2_array = []
+        u3_array = []
         t_array = []
 
-        eq1 = x[-1] - xf
-        eq2 = y[-1] - yf
-        eq3 = theta[-1] - thetaf
-        eq4 = H + 1
-        print("Final eqs: ", [eq1, eq2, eq3, eq4])
+        eqs = np.empty(nx+1)
+        eqs[:nx] = q_end[:nx] - final_states
+        eqs[-1] = H_tf + 1
+        print("Final eqs: ", eqs)
 
         E_array = np.reshape(E_array, 2*nx*(K-1))
         E_array = np.concatenate(
-            (E_array, [eq1, eq2, eq3, eq4]), axis=None)
+            (E_array, eqs), axis=None)
         return E_array
 
     def dynamics(t, s, tinitial, tfinal):
-        """Dynamics of the mobile robot"""
+        """Dynamics of the robot arm"""
 
-        global u_array, t_array
+        global u1_array, u2_array, u3_array, t_array
 
-        x_t = s[0]
-        y_t = s[1]
-        theta_t = s[2]
-        lambx_t = s[3]
-        lamby_t = s[4]
-        lambtheta_t = s[5]
+        x1_t = s[0]
+        x2_t = s[1]
+        x3_t = s[2]
+        x4_t = s[3]
+        x5_t = s[4]
+        x6_t = s[5]
+        lambx1_t = s[6]
+        lambx2_t = s[7]
+        lambx3_t = s[8]
+        lambx4_t = s[9]
+        lambx5_t = s[10]
+        lambx6_t = s[11]
 
-        u = 1 if lambtheta_t < 0 else -1
+        u1 = 1 if lambx2_t < 0 else -1
+        u2 = 1 if lambx4_t < 0 else -1
+        u3 = 1 if lambx6_t < 0 else -1
 
-        u_array.append(u)
+        u1_array.append(u1)
+        u2_array.append(u2)
+        u3_array.append(u3)
         t_array.append(t)
 
-        x_dot = np.cos(theta_t)
-        y_dot = np.sin(theta_t)
-        theta_dot = u
-        lambx_dot = 0
-        lamby_dot = 0
-        lambtheta_dot = -lambx_t*np.sin(theta_t) + lamby_t*np.cos(theta_t)
+        I_phi = ((L-x1_t)**3 + x1_t**3)/3
+        I_theta = I_phi*np.sin(x5_t)**2
+
+        x1_dot = x2_t
+        x2_dot = u1/L
+        x3_dot = x4_t
+        x4_dot = u2/I_theta
+        x5_dot = x6_t
+        x6_dot = u3/I_phi
+        lambx1_dot = -9*(lambx4_t*u2 + lambx6_t*u3/(np.sin(x5_t)**2)) * \
+            ((L-2*x2_t)/(L*(3*x1_t**2 - 3*x1_t*L + L**2)**2))
+        lambx2_dot = -lambx1_t
+        lambx3_dot = 0
+        lambx4_dot = -lambx3_t
+        lambx5_dot = 2*lambx4_t*u2/(np.tan(x5_t)*I_phi*np.sin(x5_t)**2)
+        lambx6_dot = -lambx5_t
+
         derivatives = np.array(
-            [x_dot, y_dot, theta_dot, lambx_dot, lamby_dot, lambtheta_dot])
+            [x1_dot, x2_dot, x3_dot, x4_dot, x5_dot, x6_dot, lambx1_dot, lambx2_dot, lambx3_dot, lambx4_dot, lambx5_dot, lambx6_dot])
 
         return (tfinal-tinitial)*derivatives/2
 
-    global u_array, t_array
+    global u1_array, u2_array, u3_array, t_array
 
-    u_array = []
+    u1_array = []
+    u2_array = []
+    u3_array = []
     t_array = []
-
-    xf = final_states[0]
-    yf = final_states[1]
-    thetaf = final_states[2]
-    x0 = initial_states[0]
-    y0 = initial_states[1]
-    theta0 = initial_states[2]
 
     t0 = 0
 
@@ -126,23 +128,24 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
     # Decision vector: the initial states at each partition
     changing = np.concatenate(([guesses[0:nx+1], reshaped]))
 
-    obj_sol = root(objective, changing, method="hybr", tol=1e-4)
+    obj_sol = root(objective, changing, method="hybr", tol=1e-3)
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
     print("msg: ", obj_sol.message)
     print("n func calls: ", obj_sol.nfev)
 
     obj_sol = obj_sol.x
+    _ = objective(obj_sol)
 
     tf = obj_sol[nx]
     ptot0 = np.reshape(obj_sol[nx+1:], [2*nx, K-1])
     points = 1000
     tau_array = np.empty([K, points])
-    control_val = np.empty([K, points])
+    control_val = np.empty([K, points, nu])
     states_val = np.empty([K*points, 2*nx])
 
     for k in range(K):
         if k == 0:
-            p0 = [x0, y0, theta0, obj_sol[0], obj_sol[1], obj_sol[2]]
+            p0 = np.concatenate((initial_states, obj_sol[:nx]))
         else:
             p0 = ptot0[:, k-1]
         tau_eval = np.linspace(tau[k], tau[k+1], points)
@@ -154,11 +157,15 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
             soly[ii+1, :] = soly[ii] + dynamics(t, soly[ii], t0, tf)*dt
 
         # Collect values of each partition to plot
-        control_val[k] = u_array
+        control_val[k, :, 0] = u1_array
+        control_val[k, :, 1] = u2_array
+        control_val[k, :, 2] = u3_array
         tau_array[k] = tau_eval
         states_val[points*k:points + points*k,
                    :] = soly[0:-1, :]
-        u_array = []
+        u1_array = []
+        u2_array = []
+        u3_array = []
 
     # Scale back time from (-1, 1) to (t0, tf)
     time_s = t0 + (tf-t0)*(np.reshape(tau_array, K*points) + 1)/2
@@ -170,7 +177,7 @@ def multiple_shooting(initial_states, final_states, guesses, nx, K, states_str, 
     print("tf: ", time_s[-1])
 
     plot_shooting(time=time_s, states_val=states_val, states_str=states_str,
-                  nx=nx, control_val=np.reshape(control_val, K*points), control_str=control_str, nu=nu, control_time=time_s, is_costates=True)
+                  nx=nx, control_val=np.reshape(control_val, (K*points, nu)), control_str=control_str, nu=nu, control_time=time_s, is_costates=True)
 
 
 def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates=False):
@@ -181,7 +188,7 @@ def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu
     fig1, axs1 = plt.subplots(nx)
     fig1.suptitle("State evolution of {} ".format(states_str[0:nx]))
     fig2, axs2 = plt.subplots(nu)
-    fig2.suptitle("State evolution of {} ".format(control_str))
+    fig2.suptitle("Control evolution of {} ".format(control_str))
     for jj in range(nx):
         axs1[jj].plot(time, states_val[:, jj])
         axs1[jj].set_ylabel(states_str[jj])
@@ -191,38 +198,46 @@ def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu
         for jj in range(nx):
             axs3[jj].plot(time, states_val[:, nx+jj])
             axs3[jj].set_ylabel(states_str[nx+jj])
-    axs2.plot(control_time, control_val)
-    axs2.set_ylabel(control_str[0])
+    for ii in range(nu):
+        axs2[ii].plot(control_time, control_val[:, ii])
+        axs2[ii].set_ylabel(control_str[ii])
     plt.xlabel("time [s]")
     plt.show()
 
 
 def main():
+    global L
+    nx = 6  # number of states
+    nu = 3
 
-    nx = 3  # number of states
-    nu = 1  # number of controls
+    K = 35
 
-    K = 10
-
-    s_str = ['$x$', '$y$', '$theta$']
-    cs_str = ['$lambda_x$', '$lambda_y$', '$lambda_theta$']
-    states_str = s_str + cs_str
-    control_str = ['$u$']
-
+    L = 5
     # Initial conditions
-    x0 = 0
-    y0 = 0
-    theta0 = -np.pi
-    xf = 0
-    yf = 0
-    thetaf = np.pi
+    x1_0 = 4.5
+    x2_0 = 0
+    x3_0 = 0
+    x4_0 = 0
+    x5_0 = np.pi/4
+    x6_0 = 0
+    # Final conditions
+    x1_f = 4.5
+    x2_f = 0
+    x3_f = 2*np.pi/3
+    x4_f = 0
+    x5_f = np.pi/4
+    x6_f = 0
 
-    initial_states = [x0, y0, theta0]
-    final_states = [xf, yf, thetaf]
+    states_str = ['$x_1$', '$x_2$', '$x_3$', '$x_4$', '$x_5$', '$x_6$',
+                  '$lam x_1$', '$lam x_2$', '$lam x_3$', '$lam x_4$', '$lam x_5$', '$lam x_6$']
+    control_str = ['$u_1$', '$u_2$', '$u_3$']
 
-    lamb0_guess = [1, 1, 1]
-    tf_guess = [1]
-    u_guess = [1]
+    initial_states = [x1_0, x2_0, x3_0, x4_0, x5_0, x6_0]
+    final_states = [x1_f, x2_f, x3_f, x4_f, x5_f, x6_f]
+
+    lamb0_guess = [10, 10, 10, 10, 10, 10]
+    tf_guess = [4]
+    u_guess = [0.5]
 
     guesses = lamb0_guess + tf_guess + u_guess  # list of element guesses
 

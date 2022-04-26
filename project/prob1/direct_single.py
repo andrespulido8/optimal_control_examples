@@ -1,4 +1,4 @@
-""" Script that solves the optimal control problem for the project using direct single shooting
+""" Script that solves the optimal control problem for the project problem 1 using direct single shooting
     Author: Andres Pulido
     Date: April 2022
 """
@@ -24,17 +24,10 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
 
         sol = solve_ivp(dynamics, [0, tf], initial_states,
                         method='Radau', args=[obj0[1:]])
-        x = sol.y[0]
-        y = sol.y[1]
-        theta = sol.y[2]
-
         u_array = []
         t_array = []
 
-        eq1 = x[-1] - xf
-        eq2 = y[-1] - yf
-        eq3 = theta[-1] - thetaf
-        eqs = [eq1, eq2, eq3]
+        eqs = sol.y[:, -1] - final_states
 
         print('objective eqs: ', eqs)
         return eqs
@@ -48,8 +41,7 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
         y_t = s[1]
         theta_t = s[2]
 
-        u = np.clip(np.polynomial.polynomial.polyval(
-            t, coeff), -1, 1)  # polynomial of degree N
+        u = np.tanh(coeff[0]) + coeff[1]
 
         u_array.append(u)
         t_array.append(t)
@@ -73,25 +65,19 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
     u_array = []
     t_array = []
 
-    xf = final_states[0]
-    yf = final_states[1]
-    thetaf = final_states[2]
-    x0 = initial_states[0]
-    y0 = initial_states[1]
-    theta0 = initial_states[2]
-
     t0 = 0
 
     start = time.time()
 
-    obj_vec = np.vstack((tf_guess, coeff_guess*np.ones((N+1, 1))),)
+    obj_vec = np.vstack(([tf_guess], coeff_guess*np.ones((N+1, 1))),)
 
     eq_cons = {'type': 'eq', 'fun': nonlinear_equality}
 
     bounds = np.append(bound, [bound[1], ]*(N), axis=0)
+
     obj_sol = minimize(objective, obj_vec, method='SLSQP',
                        constraints=eq_cons, options={
-                           'ftol': 1e-4, 'disp': True, 'maxiter': 200},
+                           'ftol': 1e-3, 'disp': True, 'maxiter': 300},
                        bounds=tuple(bounds))
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
     print("msg: ", obj_sol.message)
@@ -123,7 +109,7 @@ def direct_single_shooting_method(initial_states, final_states, tf_guess, coeff_
 
 
 def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates=False):
-    """ Plots all states, all costates (if is_costate == True), the beta control and the orbit transfer in polar coord.
+    """ Plots all states, all costates (if is_costate == True) and the 'u' control.
         nx - number of states
         nu - number of controls
     """
@@ -145,12 +131,17 @@ def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu
     plt.xlabel("time [s]")
     plt.show()
 
+    plt.scatter(states_val[:, 0], states_val[:, 1], c=time, s=1.5)
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.show()
+
 
 def main():
     nx = 3  # number of states
     nu = 1
 
-    N = 10  # number of degrees for polynomial
+    N = 1  # number of degrees for polynomial
 
     # Initial conditions
     x0 = 0
@@ -165,13 +156,13 @@ def main():
     initial_states = [x0, y0, theta0]
     final_states = [xf, yf, thetaf]
 
-    tf_guess = [1]
-    tf_ub = 10
-    tf_lb = 0.2
+    tf_guess = 7
+    tf_ub = 7
+    tf_lb = 4
 
-    coeff_guess = 1
-    coeff_ub = 20
-    coeff_lw = -5
+    coeff_guess = 0.5
+    coeff_ub = 1
+    coeff_lw = -1
 
     bound = [[tf_lb, tf_ub], [coeff_lw, coeff_ub]]
 

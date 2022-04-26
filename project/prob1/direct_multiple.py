@@ -1,4 +1,4 @@
-""" Script that solves the optimal control problem for the project using direct multiple shooting
+""" Script that solves the optimal control problem for the project problem 1 using direct multiple shooting
     Author: Andres Pulido
     Date: April 2022
 """
@@ -15,6 +15,12 @@ plt.style.use('seaborn-poster')
 def direct_multiple_shooting_method(initial_states, final_states, states_guess, tf_guess, coeff_guess, nx, N, K, bound, states_str, nu, control_str):
     """Solves a optimal control problem with the multiple shooting method
     """
+
+    def nonlinear_inequality1(obj0):
+        return 1 - u
+
+    def nonlinear_inequality2(obj0):
+        return u + 1
 
     def nonlinear_equality(obj0):
         """ Nonlinear equality constraint for the optimization function. The equality is the difference in the final states and the initial
@@ -38,24 +44,14 @@ def direct_multiple_shooting_method(initial_states, final_states, states_guess, 
             sol = solve_ivp(dynamics, [tau[k], tau[k+1]], p0,
                             args=(t0, tf, C_0[:, k]), method='Radau')
 
-            x = sol.y[:, 0]
-            y = sol.y[:, 1]
-            theta = sol.y[:, 2]
-
             if k < K-1:
                 ptots_end = ptot0[:, k]
-                eq1k = x[-1] - ptots_end[0]
-                eq2k = y[-1] - ptots_end[1]
-                eq3k = theta[-1] - ptots_end[2]
-                E_array[k, :] = [eq1k, eq2k, eq3k]
+                E_array[k, :] = sol.y[:, -1] - ptots_end
 
-        beta_array = []
+        u_array = []
         t_array = []
 
-        eq1 = x[-1] - xf
-        eq2 = y[-1] - yf
-        eq3 = theta[-1] - thetaf
-        eqs = [eq1, eq2, eq3]
+        eqs = sol.y[:, -1] - final_states
         print("Final eqs: ", eqs)
 
         E_array = np.reshape(E_array, nx*(K-1))
@@ -65,14 +61,16 @@ def direct_multiple_shooting_method(initial_states, final_states, states_guess, 
 
     def dynamics(t, s, tinitial, tfinal, coeff):
 
-        global u_array, t_array
+        global u_array, t_array, u
 
         x_t = s[0]
         y_t = s[1]
         theta_t = s[2]
 
-        u = np.clip(np.polynomial.polynomial.polyval(
-            t, coeff), -1, 1)
+        u = np.clip(np.tanh(coeff[0]) + coeff[1], -1, 1)
+        #u = np.polynomial.polynomial.polyval(t, coeff)
+        # u = np.clip(np.polynomial.polynomial.polyval(
+        #    t, coeff), -1, 1)
         # 1 if np.polynomial.polynomial.polyval(
         #    t, coeff) > 0 else -1  # polynomial of degree N
 
@@ -98,11 +96,6 @@ def direct_multiple_shooting_method(initial_states, final_states, states_guess, 
     u_array = []
     t_array = []
 
-    # Boundary condition at the final time
-    xf = final_states[0]
-    yf = final_states[1]
-    thetaf = final_states[2]
-
     start = time.time()
 
     C_guess = coeff_guess*np.ones((N+1, K))
@@ -116,7 +109,10 @@ def direct_multiple_shooting_method(initial_states, final_states, states_guess, 
     # Decision vector (final time, initial states at the partitions and coefficients)
     obj_vec = np.hstack(([tf_guess], np.reshape(C_guess, (N+1)*K), reshaped))
 
-    eq_cons = {'type': 'eq', 'fun': nonlinear_equality}
+    con1 = {'type': 'eq', 'fun': nonlinear_equality}
+    con2 = {'type': 'ineq', 'fun': nonlinear_inequality1}
+    con3 = {'type': 'ineq', 'fun': nonlinear_inequality2}
+    eq_cons = [con1, con2, con3]
 
     bounds = np.append([bound[0]], [bound[1], ]*(N+1)
                        * K, axis=0)  # bounds for the coefficients
@@ -125,7 +121,7 @@ def direct_multiple_shooting_method(initial_states, final_states, states_guess, 
 
     obj_sol = minimize(objective, obj_vec, method='SLSQP',
                        constraints=eq_cons, options={
-                           'ftol': 1e-4, 'disp': True},
+                           'ftol': 1e-8, 'disp': True},
                        bounds=tuple(bounds), args=(t0))
     print("Solution found? ", "yes!" if obj_sol.success == 1 else "No :(")
     print("msg: ", obj_sol.message)
@@ -176,14 +172,14 @@ def direct_multiple_shooting_method(initial_states, final_states, states_guess, 
 
 
 def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu, control_time, is_costates=False):
-    """ Plots all states, all costates (if is_costate == True), the beta control and the orbit transfer in polar coord.
+    """ Plots all states, all costates (if is_costate == True) and the 'u' control.
         nx - number of states
         nu - number of controls
     """
     fig1, axs1 = plt.subplots(nx)
     fig1.suptitle("State evolution of {} ".format(states_str[0:nx]))
     fig2, axs2 = plt.subplots(nu)
-    fig2.suptitle("State evolution of {} ".format(control_str))
+    fig2.suptitle("Control evolution of {} ".format(control_str))
     for jj in range(nx):
         axs1[jj].plot(time, states_val[:, jj])
         axs1[jj].set_ylabel(states_str[jj])
@@ -198,6 +194,11 @@ def plot_shooting(time, states_val, states_str, nx, control_val, control_str, nu
     plt.xlabel("time [s]")
     plt.show()
 
+    plt.plot(states_val[:, 0], states_val[:, 1])
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.show()
+
 
 def main():
     nx = 3  # number of states
@@ -205,7 +206,7 @@ def main():
 
     N = 1  # number of degrees for polynomial
 
-    K = 17
+    K = 8
 
     # Initial conditions
     x0 = 0
@@ -221,12 +222,12 @@ def main():
     final_states = [xf, yf, thetaf]
 
     tf_guess = 5
-    tf_ub = 7
-    tf_lb = 0.2
+    tf_ub = 8
+    tf_lb = 3
 
-    coeff_guess = 150
-    coeff_ub = 300
-    coeff_lw = -300
+    coeff_guess = 0.5
+    coeff_ub = 1
+    coeff_lw = -1
 
     states_guess = 0.1
     states_ub = 3.5
