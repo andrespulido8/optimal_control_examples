@@ -1,7 +1,7 @@
 .ipynb_checkpoints/
 doubleIntegratorSolution.pdf
 shooting_method.ipynb
-midterm/results
-project/prob1/results
-project/prob2/results
+orbit_transfer/results
+mobile_robot/results
+robot_arm/results
 
