@@ -11,7 +11,9 @@ Problems:
 - Brachistochrone
 ![brac](./Figures/brachistocrone.png)
 - Orbit Transfer
+![orbit](./Figures/orbit.png)
 - Mobile Robot
+![robot](./Figures/mobile_robot.png)
 - (Attempt of) Robot Arm
 
 Dependencies: 
