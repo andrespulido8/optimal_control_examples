@@ -21,3 +21,6 @@ Dependencies:
 - Scipy
 - Matplotlib
 - Jupyter Notebooks
+
+TODO: 
+For problems with an angle as the control, use substitution u1 = cos(angle) and u2 = sin(angle) with a path constraint of u1^2 + u2^2 = 1
