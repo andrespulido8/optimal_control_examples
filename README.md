@@ -1,5 +1,5 @@
 # Python Optimal Control Examples
-Various optimal control problems solved in python using the follwing methods:
+My attempt at various optimal control problems solved in python using the follwing methods:
 - Indirect Single Shooting
 - Indirect Multiple Shooting
 - Direct Single Shooting
